@@ -18,28 +18,27 @@ graph LR
     E -->|Store| F[(AWS DynamoDB)]
 ```
 ## Tech Stack
-* *Cloud Core:* AWS S3 (Storage), AWS DynamoDB (NoSQL Database)
+* **Cloud Core:** AWS S3 (Storage), AWS DynamoDB (NoSQL Database)
 
-* *Infrastructure as Code (IaC):* Boto3 (Python SDK) for provisioning resources.
+* **Infrastructure as Code (IaC):** Boto3 (Python SDK) for provisioning resources.
 
-* *AI/ML:* Optical Character Recognition (OCR) via REST API.
+* **AI/ML:** Optical Character Recognition (OCR) via REST API.
 
-* *Language:* Python 3.13 (Regex, Request handling).
+* **Language:** Python 3.13 (Regex, Request handling).
 
 ## Key Features
-* *Auto-Provisioning:* The entire cloud environment (Buckets, Tables) is built via code (setup_infra.py), not manually.
+* **Auto-Provisioning:** The entire cloud environment (Buckets, Tables) is built via code (setup_infra.py), not manually.
 
-* *Smart Parsing:* Custom algorithm intelligently distinguishes between "Total Amount", "Phone Numbers", and "Years" (e.g., distinguishing 2025.00 from $440.00).
+* **Smart Parsing:** Custom algorithm intelligently distinguishes between "Total Amount", "Phone Numbers", and "Years" (e.g., distinguishing 2025.00 from $440.00).
 
-* *Secure:* API Keys and Secrets are managed via git-ignored configuration files.
+* **Secure:** API Keys and Secrets are managed via git-ignored configuration files.
 
 ## Setup & Installation
 **1. Clone the Repo**
 
 ```Bash
 
-git clone [https://github.com/Tannishaa/bill-e-audit.git](https://github.com/Tannishaa/bill-e-audit.git)
-cd bill-e-audit
+git clone https://github.com/Tannishaa/bill-e-audit.git
 ```
 2. Initialize Virtual Environment
 
