@@ -8,23 +8,46 @@ from config import TABLE_NAME, REGION, OCR_API_KEY
 FILE_NAME = "receipt.png"
 OCR_ENDPOINT = "https://api.ocr.space/parse/image"
 
+# --- HELPER: RISK ENGINE ---
+def assess_risk(merchant, amount, date_str):
+    flags = []
+    
+    # Rule 1: High Value Check
+    if amount > 5000:
+        flags.append("HIGH_VALUE")
+
+    # Rule 2: Suspicious Merchants
+    suspicious_keywords = ["bar", "pub", "gaming", "netflix", "casino", "club"]
+    if any(keyword in merchant.lower() for keyword in suspicious_keywords):
+        flags.append("NON_COMPLIANT_MERCHANT")
+    
+    # Rule 3: Weekend Check
+    try:
+        #normalized the date to YYYY-MM-DD in extract_financials
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        if dt.weekday() >= 5: # 5=Saturday, 6=Sunday
+            flags.append("WEEKEND_EXPENSE")
+    except Exception as e:
+        print(f"Risk Engine Date Error: {e}") 
+
+    if flags:
+        return "FLAGGED", flags
+    return "APPROVED", ["NONE"]
+
+# --- CORE FUNCTIONS ---
+
 def get_ocr_text(filename):
-    """
-    Uploads the image to OCR.space API and returns the raw parsed text.
-    """
     print(f"Scanning '{filename}'...")
     try:
         with open(filename, 'rb') as f:
             response = requests.post(
                 OCR_ENDPOINT,
-                data={'apikey': OCR_API_KEY, 'language': 'eng'},
+                data={'apikey': OCR_API_KEY, 'language': 'eng', 'isTable': True},
                 files={'file': f}
             )
-        
         result = response.json()
         if result.get('ParsedResults'):
             return result['ParsedResults'][0]['ParsedText']
-        
         print("Warning: No text found in image.")
         return ""
     except Exception as e:
@@ -33,73 +56,89 @@ def get_ocr_text(filename):
 
 def extract_financials(text):
     """
-    Analyzes raw text to identify the transaction Date, Merchant, and Total Amount.
-    Uses regex and context-aware logic to handle messy OCR data.
+    UPGRADED: 
+    1. Fixes 'Subtotal vs Total' bugs using scoring.
+    2. Fixes 'Phone Number Bug' (ignores huge numbers).
+    3. Normalizes Dates for the Risk Engine.
     """
     data = {}
-    
-    # 1. EXTRACT DATE
-    # Looks for patterns like DD/MM/YYYY
-    date_match = re.search(r'(\d{2}/\d{2}/\d{4})', text)
+    lines = text.split('\n')
+
+    # 1. EXTRACT DATE & NORMALIZE (Fixing the Weekend Bug)
+    # Regex looks for DD-MM-YYYY or YYYY-MM-DD
+    date_match = re.search(r'(\d{2})[/-](\d{2})[/-](\d{4})|(\d{4})[/-](\d{2})[/-](\d{2})', text)
     if date_match:
-        data['Date'] = date_match.group(1)
-        # Capture the year (e.g., 2020) to ensure we don't confuse it with the price
-        ignored_year = float(data['Date'].split('/')[-1])
+        groups = date_match.groups()
+        if groups[0]: # Found DD-MM-YYYY
+            day, month, year = groups[0], groups[1], groups[2]
+            data['Date'] = f"{year}-{month}-{day}"
+        else: # Found YYYY-MM-DD
+            year, month, day = groups[3], groups[4], groups[5]
+            data['Date'] = f"{year}-{month}-{day}"
     else:
         data['Date'] = datetime.now().strftime("%Y-%m-%d")
-        ignored_year = float(datetime.now().year)
 
-    # 2. EXTRACT TOTAL AMOUNT
-    # Logic: Look for keywords "Total/Due" and scan nearby lines for the price.
-    lines = text.split('\n')
-    total_found = False
-    
-    def get_valid_nums(s):
-        """Helper to find valid prices in a string, ignoring IDs and Years."""
-        nums = re.findall(r'\d+\.?\d*', s)
-        valid = []
-        for n in nums:
+    # 2. EXTRACT MERCHANT (First non-empty line)
+    clean_lines = [line.strip() for line in lines if line.strip()]
+    data['Merchant'] = clean_lines[0] if clean_lines else "Unknown"
+
+    # 3. EXTRACT TOTAL (logic fix)
+    candidates = []
+    # Regex for currency: $10.00, 1,200.50, etc.
+    money_pattern = r'[\$£€]?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)'
+
+    for line in lines:
+        line_lower = line.lower()
+        
+        # Filter Noise (Subtotals, Tax)
+        if any(bad in line_lower for bad in ["subtotal", "tax", "vat", "change", "tender"]):
+            continue
+
+        match = re.search(money_pattern, line)
+        if match:
             try:
-                val = float(n)
-                if val != ignored_year and val < 50000: # Filter out phone numbers/IDs
-                    valid.append(val)
+                # Clean num
+                amount_str = match.group(1).replace(',', '')
+                amount = float(amount_str)
+                
+                # SANITY FILTERS 
+                
+                # Filter 1: Phone Numbers (The "Billion Dollar Bug" Fix)
+                if amount > 200000: 
+                    continue 
+
+                # Filter 2: Years (e.g., 2024)
+                if 2018 <= amount <= 2030 and "." not in match.group(1):
+                    continue
+
+                # SCORING LOGIC
+                score = 0
+                if "total" in line_lower: score += 10
+                if "amount" in line_lower: score += 5
+                if "due" in line_lower: score += 5
+                
+                candidates.append((amount, score))
             except ValueError:
-                pass
-        return valid
+                continue
 
-    for i, line in enumerate(lines):
-        if "total" in line.lower() or "due" in line.lower():
-            # Check current line + next 4 lines (handling OCR formatting gaps)
-            for lookahead in range(0, 4):
-                if i + lookahead < len(lines):
-                    target_line = lines[i + lookahead]
-                    nums = get_valid_nums(target_line)
-                    if nums:
-                        data['Total'] = max(nums)
-                        total_found = True
-                        break
-            if total_found:
-                break
+    # Pick the winner: Highest Score -> Then Highest Amount
+    if candidates:
+        candidates.sort(key=lambda x: (x[1], x[0]), reverse=True)
+        data['Total'] = candidates[0][0]
+    else:
+        data['Total'] = 0.0
 
-    # Fallback: If no keyword found, take the largest valid number in the text
-    if not total_found:
-        all_nums = get_valid_nums(text)
-        data['Total'] = max(all_nums) if all_nums else 0.0
-
-    # 3. EXTRACT MERCHANT
-    # Assumption: Merchant name is usually at the top of the receipt
-    data['Merchant'] = lines[0].strip() if lines else "Unknown"
-    
     return data
 
-def store_audit_record(data):
+def store_audit_record(data, risk_status, risk_flags):
     """
-    Saves the structured financial data into AWS DynamoDB.
+    Saves data + Risk Assessment to DynamoDB
     """
     dynamodb = boto3.resource('dynamodb', region_name=REGION)
     table = dynamodb.Table(TABLE_NAME)
     
-    print(f"Saving to Cloud Ledger: {data}")
+    print(f"Total: {data['Total']} | Merchant: {data['Merchant']}")
+    print(f"Risk Status: {risk_status} | Flags: {risk_flags}")
     
     try:
         table.put_item(
@@ -107,27 +146,30 @@ def store_audit_record(data):
                 'ReceiptID': str(datetime.now().timestamp()),
                 'Merchant': data['Merchant'],
                 'Date': data['Date'],
-                'Total': str(data['Total']),
+                'Total': str(data['Total']), # DynamoDB likes strings for currency to avoid float errors
                 'Status': 'Audited',
+                'RiskStatus': risk_status,    
+                'RiskFlags': risk_flags,      
                 'AuditedAt': datetime.now().isoformat()
             }
         )
-        print("SUCCESS! Record saved to DynamoDB.")
+        print("SUCCESS! Record saved to Cloud Ledger.")
     except Exception as e:
         print(f"Database Error: {e}")
 
+# --- MAIN EXECUTION ---
 if __name__ == "__main__":
     # 1. Ingest
     raw_text = get_ocr_text(FILE_NAME)
     
     if raw_text:
-        # 2. Process
+        # 2. Extract Data
         clean_data = extract_financials(raw_text)
-        print("\n--- AUDIT RESULT ---")
-        print(clean_data)
-        print("--------------------")
         
-        # 3. Storage
-        store_audit_record(clean_data)
+        # 3. Assess Risk 
+        r_status, r_flags = assess_risk(clean_data['Merchant'], clean_data['Total'], clean_data['Date'])
+        
+        # 4. Storage
+        store_audit_record(clean_data, r_status, r_flags)
     else:
         print("Failed to process receipt.")
