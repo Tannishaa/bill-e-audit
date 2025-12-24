@@ -22,7 +22,8 @@ graph LR
     C -->|Risk Logic| E[Clean Data JSON]
     E -->|Store| F[(AWS DynamoDB)]
     F -->|Fetch Data| G[Streamlit Dashboard]  
-      ## Tech Stack
+```
+## Tech Stack
 * **Cloud Core:** AWS S3 (Storage), AWS DynamoDB (NoSQL Database)
 
 * **Infrastructure as Code (IaC):** Boto3 (Python SDK) for auto-provisioning resources.
