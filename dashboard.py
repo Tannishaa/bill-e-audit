@@ -5,7 +5,7 @@ from datetime import datetime
 from config import TABLE_NAME, REGION
 
 # --- CONFIGURATION ---
-st.set_page_config(page_title="Bill-E Risk Command", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="Automated Expense Audit & ETL Pipeline", page_icon="🛡️", layout="wide")
 
 # Connect to DynamoDB
 dynamodb = boto3.resource('dynamodb', region_name=REGION)
@@ -17,7 +17,7 @@ status_filter = st.sidebar.radio("Filter by Status", ["All", "FLAGGED", "APPROVE
 date_filter = st.sidebar.date_input("Date Range", [])
 
 # --- MAIN DASHBOARD ---
-st.title("Bill-E: Corporate Expense Audit")
+st.title("Automated Expense Audit & ETL Pipeline")
 st.markdown("Live view of incoming financial documents and automated risk assessment.")
 
 # 1. FETCH DATA
@@ -48,7 +48,7 @@ try:
         c1, c2 = st.columns(2)
         with c1:
             st.subheader("Risk Distribution")
-            st.bar_chart(df['RiskStatus'].value_counts(), color="#ff4b4b")
+            st.bar_chart(df['RiskStatus'].value_counts(), color="#581717")
             
         with c2:
             st.subheader("High Value Transactions")
@@ -57,7 +57,7 @@ try:
             st.dataframe(top_expenses, use_container_width=True)
 
         # 4. DATA TABLE
-        st.subheader("📝 Live Audit Log")
+        st.subheader("Live Audit Log")
         
         # Apply Filters
         if status_filter != "All":

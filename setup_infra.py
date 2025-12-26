@@ -13,7 +13,7 @@ def create_infrastructure():
     s3 = boto3.client('s3', region_name=REGION)
     dynamodb = boto3.client('dynamodb', region_name=REGION)
 
-    print(f"🚀 Initializing Cloud Infrastructure in {REGION}...")
+    print(f"Initializing Cloud Infrastructure in {REGION}...")
 
     # 1. Create S3 Bucket
     try:
@@ -21,9 +21,9 @@ def create_infrastructure():
             Bucket=BUCKET_NAME,
             CreateBucketConfiguration={'LocationConstraint': REGION}
         )
-        print(f"✅ S3 Bucket Created: {BUCKET_NAME}")
+        print(f"S3 Bucket Created: {BUCKET_NAME}")
     except Exception as e:
-        print(f"❌ Error creating bucket: {e}")
+        print(f"Error creating bucket: {e}")
 
     # 2. Create DynamoDB Table
     try:
@@ -40,20 +40,20 @@ def create_infrastructure():
                 'WriteCapacityUnits': 5
             }
         )
-        print(f"✅ DynamoDB Table Creating: {TABLE_NAME}")
+        print(f"DynamoDB Table Creating: {TABLE_NAME}")
         print("   (This might take 10-20 seconds to become active)")
     except Exception as e:
         if "ResourceInUseException" in str(e):
-            print(f"⚠️  Table '{TABLE_NAME}' already exists. Skipping.")
+            print(f" Table '{TABLE_NAME}' already exists. Skipping.")
         else:
-            print(f"❌ Error creating table: {e}")
+            print(f" Error creating table: {e}")
 
     # 3. Save the config for later use
     with open("config.py", "w") as f:
         f.write(f'BUCKET_NAME = "{BUCKET_NAME}"\n')
         f.write(f'TABLE_NAME = "{TABLE_NAME}"\n')
         f.write(f'REGION = "{REGION}"\n')
-    print("💾 Configuration saved to config.py")
+    print(" Configuration saved to config.py")
 
 if __name__ == "__main__":
     create_infrastructure()

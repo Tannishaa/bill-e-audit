@@ -1,4 +1,4 @@
-# 🧾 Bill-E: AI-Powered Financial Auditor
+# 🧾 Automated Expense Audit & ETL Pipeline |
 ## Live Risk Dashboard
 *Built with Streamlit to visualize audit logs and flag suspicious transactions in real-time.*
 
@@ -9,7 +9,7 @@
 ![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-red?style=for-the-badge&logo=streamlit)
 ![Status](https://img.shields.io/badge/Status-Completed-success?style=for-the-badge)
 
-**Bill-E** is a serverless financial pipeline that automates the digitization of physical receipts. It uses **Computer Vision (OCR)** to extract unstructured text, applies a custom **Heuristic Risk Engine** to detect anomalies (like high-value or weekend transactions), and visualizes the audit trail via a real-time **Streamlit Dashboard**.
+**Automated Expense Audit & ETL Pipeline |** is a serverless financial pipeline that automates the digitization of physical receipts. It uses **Computer Vision (OCR)** to extract unstructured text, applies a custom **Heuristic Risk Engine** to detect anomalies (like high-value or weekend transactions), and visualizes the audit trail via a real-time **Streamlit Dashboard**.
 
 ## Architecture Flow
 

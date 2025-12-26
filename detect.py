@@ -7,7 +7,7 @@ FILE_NAME = "receipt.png"
 # ---------------------
 
 def extract_text_free(filename):
-    print(f"🧠 Sending '{filename}' to Free OCR API...")
+    print(f"Sending '{filename}' to Free OCR API...")
     
     try:
         # 1. Open the image file
@@ -31,22 +31,22 @@ def extract_text_free(filename):
         result = response.json()
         
         if result['IsErroredOnProcessing']:
-            print("❌ API Error:", result['ErrorMessage'])
+            print("API Error:", result['ErrorMessage'])
             return
 
-        print("\n--- 📝 EXTRACTED DATA ---")
+        print("\n--- EXTRACTED DATA ---")
         parsed_results = result.get('ParsedResults', [])
         
         if parsed_results:
             text = parsed_results[0].get('ParsedText')
             print(text)
             print("-------------------------")
-            print("✅ AI Read Complete (Zero Cost).")
+            print(" AI Read Complete (Zero Cost).")
         else:
-            print("⚠️ No text found.")
+            print(" No text found.")
 
     except Exception as e:
-        print(f"❌ Connection Error: {e}")
+        print(f" Connection Error: {e}")
 
 if __name__ == "__main__":
     extract_text_free(FILE_NAME)
