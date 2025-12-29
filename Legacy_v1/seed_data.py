@@ -1,7 +1,7 @@
 import boto3
 import random
 from datetime import datetime, timedelta
-from config import TABLE_NAME, REGION
+from Legacy_v1.config import TABLE_NAME, REGION
 
 dynamodb = boto3.resource('dynamodb', region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)

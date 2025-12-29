@@ -2,7 +2,7 @@ import requests
 import json
 
 # --- CONFIGURATION ---
-API_KEY = "K81622954488957"  # <--- PASTE KEY FROM EMAIL HERE
+API_KEY = "your-api-key"  # Free OCR API Key
 FILE_NAME = "receipt.png"
 # ---------------------
 

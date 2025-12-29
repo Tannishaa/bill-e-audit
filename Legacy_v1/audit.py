@@ -2,7 +2,7 @@ import boto3
 import requests
 import re
 from datetime import datetime
-from config import TABLE_NAME, REGION, OCR_API_KEY
+from Legacy_v1.config import TABLE_NAME, REGION, OCR_API_KEY
 
 # --- CONSTANTS ---
 FILE_NAME = "receipt.png"

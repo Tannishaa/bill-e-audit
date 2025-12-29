@@ -1,6 +1,6 @@
 import boto3
 import os
-from config import BUCKET_NAME, REGION
+from Legacy_v1.config import BUCKET_NAME, REGION
 
 def upload_file(file_name):
     s3 = boto3.client('s3', region_name=REGION)

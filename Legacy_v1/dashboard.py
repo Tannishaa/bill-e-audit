@@ -2,7 +2,7 @@ import streamlit as st
 import boto3
 import pandas as pd
 from datetime import datetime
-from config import TABLE_NAME, REGION
+from Legacy_v1.config import TABLE_NAME, REGION
 
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Automated Expense Audit & ETL Pipeline", page_icon="🛡️", layout="wide")

@@ -1,100 +1,76 @@
-# 🧾 Automated Expense Audit & ETL Pipeline |
-## Live Risk Dashboard
-*Built with Streamlit to visualize audit logs and flag suspicious transactions in real-time.*
-
+# ☁️ Bill-E: Serverless Event-Driven Audit Pipeline
+## Cloud-Native Expense Integrity System
+*Built with Terraform, AWS Lambda, and Event-Driven Architecture.*
 ![Dashboard](bill-e.png)
+![Terraform](https://img.shields.io/badge/Terraform-IaC-purple?style=for-the-badge&logo=terraform)
+![AWS](https://img.shields.io/badge/AWS-Lambda%20%7C%20SQS%20%7C%20DynamoDB-orange?style=for-the-badge&logo=amazon-aws)
+![Python](https://img.shields.io/badge/Python-3.9-blue?style=for-the-badge&logo=python)
+![Status](https://img.shields.io/badge/Status-Live-success?style=for-the-badge)
 
-![Python](https://img.shields.io/badge/Python-3.13-blue?style=for-the-badge&logo=python)
-![AWS](https://img.shields.io/badge/AWS-S3%20%7C%20DynamoDB-orange?style=for-the-badge&logo=amazon-aws)
-![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-red?style=for-the-badge&logo=streamlit)
-![Status](https://img.shields.io/badge/Status-Completed-success?style=for-the-badge)
+**Bill-E** is a fully automated, serverless pipeline designed to ingest, validate, and store financial receipts. Unlike traditional scripts, this project uses an **Event-Driven Architecture**: uploading a file to S3 automatically triggers an asynchronous processing workflow involving SQS queuing, Lambda execution, and DynamoDB storage.
 
-**Automated Expense Audit & ETL Pipeline |** is a serverless financial pipeline that automates the digitization of physical receipts. It uses **Computer Vision (OCR)** to extract unstructured text, applies a custom **Heuristic Risk Engine** to detect anomalies (like high-value or weekend transactions), and visualizes the audit trail via a real-time **Streamlit Dashboard**.
+It implements **Infrastructure as Code (IaC)** using Terraform, allowing the entire cloud environment to be provisioned or destroyed with a single command.
 
-## Architecture Flow
+## Architecture
 
 ```mermaid
 graph LR
-    A[Receipt Image] -->|Upload| B(AWS S3 Bucket)
-    B -->|Trigger| C{Python Audit Script}
-    C -->|API Request| D[OCR.space AI Service]
-    D -->|Raw Text| C
-    C -->|Risk Logic| E[Clean Data JSON]
-    E -->|Store| F[(AWS DynamoDB)]
-    F -->|Fetch Data| G[Streamlit Dashboard]  
+    A[Receipt Upload] -->|S3 Event| B(AWS S3 Bucket)
+    B -->|Notification| C[Amazon SQS Queue]
+    C -->|Trigger| D{Lambda: Processor}
+    D -->|SHA-256 Hash| E[Duplicate Check]
+    E -->|Write Data| F[(DynamoDB Ledger)]
+    G[Client / Web] -->|GET Request| H[API Gateway]
+    H -->|Invoke| I{Lambda: Reader}
+    I -->|Read Data| F
 ```
 ## Tech Stack
-* **Cloud Core:** AWS S3 (Storage), AWS DynamoDB (NoSQL Database)
+* **Infrastructure as Code: Terraform (State management, Provider configuration).
 
-* **Infrastructure as Code (IaC):** Boto3 (Python SDK) for auto-provisioning resources.
+* **Compute:** AWS Lambda (Serverless Python functions).
 
-* **AI/ML:** Optical Character Recognition (OCR) via REST API.
+* **Orchestration:** Amazon SQS (Decoupled message queuing).
 
-* **Language:** Python 3.13 (Regex, Request handling, Pandas).
+**Storage:** AWS S3 (Object storage) & DynamoDB (NoSQL Ledger).
+
+**API:** AWS API Gateway (HTTP API v2).
+
+**Security:** IAM Roles with least-privilege policies.
 
 ## Key Features
-* **Automated Risk Engine:** Automatically flags suspicious activities like *High Value Transactions (>₹5,000)*, *Non-Compliant Merchants* (e.g., Casinos), and *Weekend Expenses*.
-* **Smart Parsing:** Custom heuristic algorithm intelligently distinguishes between "Total Amount", "Phone Numbers", and "Dates" (e.g., distinguishing 2025.00 from $440.00).
+* **Event-Driven Architecture:** Fully decoupled pipeline using *AWS SQS* to handle high-concurrency uploads without losing data.
 
-* **Live Dashboard:** Interactive UI to monitor total spend, risk distribution, and audit logs in real-time.
+**Infrastructure as Code (IaC):** Entire cloud stack (6+ resources) provisioned automatically using Terraform, ensuring reproducible deployments.
 
-* **Auto-Provisioning:** The entire cloud environment is built via code (setup_infra.py), not manually.
+**Data Integrity & Security:** Implements *SHA-256 cryptographic hashing* to generate unique digital fingerprints for every receipt, preventing duplicate uploads and ensuring data consistency.
 
-## Setup & Installation
-**1. Clone the Repo**
+**Serverless Compute:** Logic runs on *AWS Lambda* (Python 3.9), eliminating the need for always-on servers and reducing costs to near-zero.
+
+**RESTful API Access:** Data is exposed securely via *AWS API Gateway*, allowing frontends to fetch audit logs in real-time.
+
+## Setup & Deployment
+**1. Prerequisites**
+* AWS CLI configured with credentials.
+* Terraform installed.
+
+**2. Clone the Repo**
 
 ```Bash
 
 git clone https://github.com/Tannishaa/bill-e-audit.git
 ```
-2. Initialize Virtual Environment
+**3. Deploy Infrastructure (Terraform)** This single command builds the S3 Bucket, SQS Queue, Lambdas, DynamoDB Table, and API Gateway.
 
 ```Bash
-python -m venv venv
-# Windows:
-.\venv\Scripts\Activate.ps1
-# Mac/Linux:
-source venv/bin/activate
+cd terraform
+terraform init
+terraform apply
+# Type 'yes' to confirm
 ```
-**3. Install Dependencies**
+**4. Trigger the Pipeline** Upload a file to the created S3 bucket (check Terraform outputs for the name).
 
 ```Bash
-
-pip install -r requirements.txt
+# You can use the AWS Console or CLI
+aws s3 cp receipt.png s3://bill-e-uploads-xxxx/
 ```
-**4. Configure Secrets:** Create a config.py file in the root directory:
-
-```Python
-
-# config.py
-# config.py
-BUCKET_NAME = "your-unique-bucket-name"
-TABLE_NAME = "ExpenseLedger"
-REGION = "ap-south-1"
-OCR_API_KEY = "your_ocr_space_key"
-```
-##  Usage
-**Step 1: Build the Cloud Infrastructure:** Run this once to create your S3 Bucket and DynamoDB Table.
-
-```Bash
-
-python setup_infra.py
-```
-**Step 2: Upload a Receipt:** Place your image as receipt.png and run:
-
-```Bash
-
-python upload.py
-```
-**Step 3: Run the Audit:** This extracts the data and saves it to the database.
-
-```Bash
-
-python audit.py
-```
-**Step 4:** Launch the Risk Dashboard View your data and risk alerts in the browser.
-```Bash
-
-streamlit run dashboard.py
-```
-
+**5. View Data** Use the API Endpoint output by Terraform to see your processed data JSON.
