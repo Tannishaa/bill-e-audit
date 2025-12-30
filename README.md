@@ -18,19 +18,19 @@ The entire stack is deployed via **Infrastructure as Code (Terraform)** and visu
 
 ```mermaid
 graph LR
-    User[User Upload] -->|Image/PDF| S3(AWS S3 Bucket)
+    User[User Upload] -->|Image or PDF| S3(AWS S3 Bucket)
     S3 -->|Event Notification| SQS[Amazon SQS Queue]
     SQS -->|Trigger| Lambda{Lambda: Processor}
     
-    subgraph "The Brain (Python)"
+    subgraph Brain [The Brain - Python]
         Lambda -->|API Call| OCR[OCR.space AI Engine]
         OCR -->|Extracted Text| Risk[Risk Engine Logic]
-        Risk -->|Risk Score > 50| SNS[AWS SNS (Email Alert)]
+        Risk -- High Risk Score --> SNS[AWS SNS Email Alert]
     end
     
     Risk -->|JSON Audit Log| DB[(DynamoDB Ledger)]
     
-    subgraph "Frontend"
+    subgraph Frontend [Frontend]
         Dash[Streamlit Cloud] -->|GET /expenses| API[API Gateway]
         API -->|Invoke| Reader{Lambda: Reader}
         Reader -->|Fetch| DB
