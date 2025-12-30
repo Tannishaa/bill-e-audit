@@ -10,73 +10,76 @@ from streamlit_autorefresh import st_autorefresh
 # --- CONFIGURATION ---
 load_dotenv()
 
-# Load Secrets
 if "API_URL" in st.secrets:
     API_URL = st.secrets["API_URL"]
     BUCKET_NAME = st.secrets["BUCKET_NAME"]
-    SNS_TOPIC_ARN = st.secrets.get("SNS_TOPIC_ARN") # <--- NEW
-    
+    SNS_TOPIC_ARN = st.secrets.get("SNS_TOPIC_ARN")
     if "AWS_ACCESS_KEY_ID" in st.secrets:
         os.environ["AWS_ACCESS_KEY_ID"] = st.secrets["AWS_ACCESS_KEY_ID"]
         os.environ["AWS_SECRET_ACCESS_KEY"] = st.secrets["AWS_SECRET_ACCESS_KEY"]
         os.environ["AWS_DEFAULT_REGION"] = st.secrets["AWS_DEFAULT_REGION"]
 else:
-    # Local fallback
     API_URL = os.getenv("API_URL")
     BUCKET_NAME = os.getenv("BUCKET_NAME")
     SNS_TOPIC_ARN = os.getenv("SNS_TOPIC_ARN")
 
 st.set_page_config(page_title="Bill-E Audit Dashboard", layout="wide")
 
-# --- THE BOUNCER & THE DOORBELL ---
-st.sidebar.title("🔒 Login")
-password = st.sidebar.text_input("Enter Access Code", type="password")
+# --- 📱 MOBILE-FIRST LOGIN (Main Screen, Not Sidebar) ---
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
 
-if password == "admin123":
-    # 1. Check if we already rang the doorbell for this user session
-    if "doorbell_rung" not in st.session_state:
-        # 2. Ring the Doorbell (Send Email)
-        if SNS_TOPIC_ARN:
-            try:
-                sns = boto3.client('sns')
-                sns.publish(
-                    TopicArn=SNS_TOPIC_ARN,
-                    Message=f"🔔 Ding Dong! Someone just logged into Bill-E Dashboard at {datetime.datetime.now()}.",
-                    Subject=" Bill-E Visitor Alert"
-                )
-                print("Doorbell rung!")
-            except Exception as e:
-                print(f"Doorbell broken: {e}")
-        
-        # 3. Mark as rung so we don't spam you on every refresh
-        st.session_state["doorbell_rung"] = True
-        
-    st.sidebar.success("Access Granted")
+if not st.session_state["authenticated"]:
+    st.title("🔐 Bill-E: Restricted Access")
+    st.markdown("This is a live production portfolio. Please authenticate.")
+    
+    # Input is now big and in the middle of the screen
+    password = st.text_input("Enter Access Code", type="password")
+    
+    if st.button("Login"):
+        if password == "admin123":
+            st.session_state["authenticated"] = True
+            st.rerun() # Refresh to show the app
+        else:
+            st.error(" Incorrect Access Code")
+    
+    st.stop() # Stop here if not logged in
 
-else:
-    st.title("🧾 Bill-E: Live Audit Ledger")
-    st.markdown("---")
-    st.warning("Access Restricted")
-    st.info("This is a live portfolio project. Please enter the access code to view the dashboard.")
-    st.stop() 
+# ---  THE DOORBELL (Runs once after login) ---
+if "doorbell_rung" not in st.session_state:
+    if SNS_TOPIC_ARN:
+        try:
+            sns = boto3.client('sns')
+            sns.publish(
+                TopicArn=SNS_TOPIC_ARN,
+                Message=f"🔔 Ding Dong! Visitor logged in at {datetime.datetime.now()}.",
+                Subject=" Bill-E Visitor Alert"
+            )
+        except:
+            pass
+    st.session_state["doorbell_rung"] = True
 
 # ---  APP STARTS HERE ---
 
-# --- SAFETY CHECK ---
-if not API_URL or not BUCKET_NAME:
-    st.error("Missing Configuration! Check your secrets.")
-    st.stop()
-
-# --- SIDEBAR SETTINGS ---
-st.sidebar.markdown("---")
 st.sidebar.title("⚙️ Settings")
-use_auto_refresh = st.sidebar.checkbox("Enable Live Updates", value=True)
+st.sidebar.success("🔓 Access Granted")
+
+# ---  SLEEP MODE LOGIC ---
+# Default to ON, but with a LIMIT.
+# interval=10000 means 10 seconds.
+# limit=20 means it runs 20 times (200 seconds = ~3.5 minutes) then STOPS.
+use_auto_refresh = st.sidebar.checkbox(" Enable Live Updates", value=True)
 
 if use_auto_refresh:
-    count = st_autorefresh(interval=5000, limit=100, key="data_refresh")
+    count = st_autorefresh(interval=10000, limit=20, key="data_refresh")
 
 st.title("🧾 Bill-E: Live Audit Ledger")
 st.markdown("---")
+
+# --- SAFETY CHECK ---
+if not API_URL or not BUCKET_NAME:
+    st.error(" Missing Configuration!")
+    st.stop()
 
 # --- UPLOAD SECTION ---
 st.subheader("Upload New Receipt")
@@ -122,10 +125,11 @@ try:
                 
             col2.metric("Processed Successfully", processed_count)
             
-            if use_auto_refresh:
-                col3.metric("System Health", "Live Updates ON")
+            # Show user if the connection is live or sleeping
+            if use_auto_refresh and count < 20:
+                 col3.metric("System Health", "Live (Auto-Sleep in 3m)")
             else:
-                col3.metric("System Health", "Live Updates OFF")
+                 col3.metric("System Health", "Standby (Click Refresh)")
 
             # --- TABLE ---
             st.subheader("Audit Trail")
@@ -136,8 +140,13 @@ try:
                 return [''] * len(row)
 
             st.dataframe(df.style.apply(highlight_risk, axis=1), width=1200)
+            
     else:
         st.error(f"Failed to fetch data. API Status: {response.status_code}")
 
 except Exception as e:
     st.error(f"Connection Error: {str(e)}")
+
+# Manual Refresh Button (Always visible)
+if st.button(' Manual Refresh'):
+    st.rerun()
