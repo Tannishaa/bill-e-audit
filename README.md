@@ -1,4 +1,4 @@
-# ☁️ Bill-E: Serverless Event-Driven Audit Pipeline
+# Bill-E: Serverless Event-Driven Audit Pipeline
 ## Cloud-Native Expense Integrity System
 *Built with Terraform, AWS Lambda, and Event-Driven Architecture.*
 ![Dashboard](bill-e.png)

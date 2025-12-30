@@ -15,7 +15,7 @@ def lambda_handler(event, context):
     try:
         # 1. Scan the table (Get all items)
         # In a huge production app, we would Query, not Scan. 
-        # But for < 1000 items, Scan is perfectly fine.
+        # But for < 1000 items, Scan is perfectly fine
         response = table.scan()
         items = response.get('Items', [])
         

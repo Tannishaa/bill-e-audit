@@ -12,3 +12,5 @@ __pycache__/
 # --- Secrets ---
 .env
 *.pem
+terraform/terraform.tfvars
+venv/
