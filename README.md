@@ -1,57 +1,71 @@
-# Bill-E: Serverless Event-Driven Audit Pipeline
-## Cloud-Native Expense Integrity System
-*Built with Terraform, AWS Lambda, and Event-Driven Architecture.*
-![Dashboard](bill-e.png)
+# Bill-E: Serverless AI Audit & Risk Engine
+## Cloud-Native Fraud Detection System
+*Built with Terraform, AWS Lambda, OCR AI, and Event-Driven Architecture.*
+
+![Dashboard](https://img.shields.io/badge/Frontend-Streamlit-ff4b4b?style=for-the-badge&logo=streamlit)
 ![Terraform](https://img.shields.io/badge/Terraform-IaC-purple?style=for-the-badge&logo=terraform)
-![AWS](https://img.shields.io/badge/AWS-Lambda%20%7C%20SQS%20%7C%20DynamoDB-orange?style=for-the-badge&logo=amazon-aws)
+![AWS](https://img.shields.io/badge/AWS-Lambda%20%7C%20SNS%20%7C%20DynamoDB-orange?style=for-the-badge&logo=amazon-aws)
 ![Python](https://img.shields.io/badge/Python-3.9-blue?style=for-the-badge&logo=python)
-![Status](https://img.shields.io/badge/Status-Live-success?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Live_Production-success?style=for-the-badge)
 
-**Bill-E** is a fully automated, serverless pipeline designed to ingest, validate, and store financial receipts. Unlike traditional scripts, this project uses an **Event-Driven Architecture**: uploading a file to S3 automatically triggers an asynchronous processing workflow involving SQS queuing, Lambda execution, and DynamoDB storage.
+**Bill-E** is an automated, event-driven cloud pipeline designed to audit financial receipts in real-time. It uses **AI (Computer Vision)** to extract text from unstructured images, applies a **Heuristic Risk Engine** to detect fraud (e.g., "Casino", "Alcohol"), and instantly notifies auditors via **Email Alerts** if high-risk items are found.
 
-It implements **Infrastructure as Code (IaC)** using Terraform, allowing the entire cloud environment to be provisioned or destroyed with a single command.
+The entire stack is deployed via **Infrastructure as Code (Terraform)** and visualized on a **Live Streamlit Dashboard**.
+
+---
 
 ## Architecture
 
 ```mermaid
 graph LR
-    A[Receipt Upload] -->|S3 Event| B(AWS S3 Bucket)
-    B -->|Notification| C[Amazon SQS Queue]
-    C -->|Trigger| D{Lambda: Processor}
-    D -->|SHA-256 Hash| E[Duplicate Check]
-    E -->|Write Data| F[(DynamoDB Ledger)]
-    G[Client / Web] -->|GET Request| H[API Gateway]
-    H -->|Invoke| I{Lambda: Reader}
-    I -->|Read Data| F
+    User[User Upload] -->|Image/PDF| S3(AWS S3 Bucket)
+    S3 -->|Event Notification| SQS[Amazon SQS Queue]
+    SQS -->|Trigger| Lambda{Lambda: Processor}
+    
+    subgraph "The Brain (Python)"
+        Lambda -->|API Call| OCR[OCR.space AI Engine]
+        OCR -->|Extracted Text| Risk[Risk Engine Logic]
+        Risk -->|Risk Score > 50| SNS[AWS SNS (Email Alert)]
+    end
+    
+    Risk -->|JSON Audit Log| DB[(DynamoDB Ledger)]
+    
+    subgraph "Frontend"
+        Dash[Streamlit Cloud] -->|GET /expenses| API[API Gateway]
+        API -->|Invoke| Reader{Lambda: Reader}
+        Reader -->|Fetch| DB
+    end
 ```
 ## Tech Stack
-* **Infrastructure as Code: Terraform (State management, Provider configuration).
+* **IaC:** Terraform
 
-* **Compute:** AWS Lambda (Serverless Python functions).
+* **Compute:** AWS Lambda (Python 3.9)
 
-* **Orchestration:** Amazon SQS (Decoupled message queuing).
+* **Orchestration:** Amazon SQS, AWS SNS
 
-**Storage:** AWS S3 (Object storage) & DynamoDB (NoSQL Ledger).
+* **Database:** DynamoDB (On-Demand)
 
-**API:** AWS API Gateway (HTTP API v2).
+* **AI/ML:** OCR.space API (Engine 2)
 
-**Security:** IAM Roles with least-privilege policies.
+* **Frontend:** Streamlit Community Cloud
 
 ## Key Features
-* **Event-Driven Architecture:** Fully decoupled pipeline using *AWS SQS* to handle high-concurrency uploads without losing data.
+* **AI-Powered Analysis:** Integrates OCR (Optical Character Recognition) to extract text from unstructured JPEGs/PNGs, replacing fragile Regex parsing.
 
-**Infrastructure as Code (IaC):** Entire cloud stack (6+ resources) provisioned automatically using Terraform, ensuring reproducible deployments.
+* **Real-Time Fraud Detection:** Python-based Risk Engine analyzes receipt text for flagged keywords (e.g., Casino, Alcohol) and assigns a dynamic Risk Score (0-100).
 
-**Data Integrity & Security:** Implements *SHA-256 cryptographic hashing* to generate unique digital fingerprints for every receipt, preventing duplicate uploads and ensuring data consistency.
+* **"The Snitch" Protocol:** Uses AWS SNS to push immediate email alerts to administrators when high-risk transactions are detected.
 
-**Serverless Compute:** Logic runs on *AWS Lambda* (Python 3.9), eliminating the need for always-on servers and reducing costs to near-zero.
+*  **Event-Driven & Serverless:** Zero-idle architecture. Uploads trigger S3 → SQS → Lambda workflows, ensuring the system costs $0 when not in use.
 
-**RESTful API Access:** Data is exposed securely via *AWS API Gateway*, allowing frontends to fetch audit logs in real-time.
+*  **Live Audit Dashboard:** A public Streamlit web app that auto-refreshes to show the live audit trail and risk heatmaps.
 
+* **Infrastructure as Code:** 100% of the AWS infrastructure (8+ resources) is provisioned automatically using Terraform.
 ## Setup & Deployment
 **1. Prerequisites**
 * AWS CLI configured with credentials.
 * Terraform installed.
+* OCR.space API Key (Free).
 
 **2. Clone the Repo**
 
@@ -59,18 +73,25 @@ graph LR
 
 git clone https://github.com/Tannishaa/bill-e-audit.git
 ```
-**3. Deploy Infrastructure (Terraform)** This single command builds the S3 Bucket, SQS Queue, Lambdas, DynamoDB Table, and API Gateway.
+**3. Configure Secrets** Create a terraform/terraform.tfvars file to store your sensitive keys:
+```Ini, TOML
 
+ocr_api_key = "YOUR_OCR_KEY"
+alert_email = "your.email@example.com"
+```
+**4. Deploy Infrastructure (Terraform)** 
 ```Bash
 cd terraform
 terraform init
 terraform apply
 # Type 'yes' to confirm
 ```
-**4. Trigger the Pipeline** Upload a file to the created S3 bucket (check Terraform outputs for the name).
+**5. Deploy Dashboard**
 
-```Bash
-# You can use the AWS Console or CLI
-aws s3 cp receipt.png s3://bill-e-uploads-xxxx/
-```
-**5. View Data** Use the API Endpoint output by Terraform to see your processed data JSON.
+* Push code to GitHub.
+
+* Connect repo to **Streamlit Community Cloud.**
+
+* Add secrets (API_URL, BUCKET_NAME, AWS_ACCESS_KEY_ID, etc.) in the Streamlit settings.
+
+## Screenshots
