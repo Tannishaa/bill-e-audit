@@ -5,7 +5,7 @@ import boto3
 import os
 import time
 from dotenv import load_dotenv
-from streamlit_autorefresh import st_autorefresh  # NEW IMPORT
+from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURATION ---
 load_dotenv()
@@ -23,18 +23,32 @@ else:
 
 st.set_page_config(page_title="Bill-E Audit Dashboard", layout="wide")
 
+# ---  THE Security Check ---
+# This stops anyone without the code from seeing the app
+st.sidebar.title("Login")
+password = st.sidebar.text_input("Enter Access Code", type="password")
+
+if password != "admin123":  # <--- YOU CAN CHANGE THIS PASSWORD
+    st.title("🧾 Bill-E: Live Audit Ledger")
+    st.markdown("---")
+    st.warning("Access Restricted")
+    st.info("This is a live portfolio project. Please enter the access code to view the dashboard.")
+    st.stop()  # STOPS execution here. The rest of the code won't run.
+
+# ---  APP STARTS HERE (Only runs if password is correct) ---
+
 # --- SAFETY CHECK ---
 if not API_URL or not BUCKET_NAME:
     st.error("Missing Configuration! Check your .env or Streamlit Secrets.")
     st.stop()
 
-# --- SIDEBAR CONFIG ---
+# --- SIDEBAR SETTINGS ---
+st.sidebar.success("Access Granted")
+st.sidebar.markdown("---")
 st.sidebar.title("⚙️ Settings")
-# The "Run" switch. default=True means it starts automatically.
 use_auto_refresh = st.sidebar.checkbox("Enable Live Updates", value=True)
 
 if use_auto_refresh:
-    # Refreshes the page every 5000ms (5 seconds)
     count = st_autorefresh(interval=5000, limit=100, key="data_refresh")
 
 st.title("🧾 Bill-E: Live Audit Ledger")
@@ -51,7 +65,6 @@ if uploaded_file is not None:
             try:
                 s3.upload_fileobj(uploaded_file, BUCKET_NAME, uploaded_file.name)
                 st.success(f"Uploaded {uploaded_file.name} successfully!")
-                # No need to wait/sleep, the auto-refresh will catch it in ~5 seconds
             except Exception as e:
                 st.error(f"Upload failed: {e}")
 
@@ -85,7 +98,6 @@ try:
                 
             col2.metric("Processed Successfully", processed_count)
             
-            # Dynamic Health Check
             if use_auto_refresh:
                 col3.metric("System Health", "Live Updates ON")
             else:
