@@ -3,47 +3,71 @@ import requests
 import pandas as pd
 import boto3
 import os
-import time
+import datetime
 from dotenv import load_dotenv
 from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURATION ---
 load_dotenv()
 
+# Load Secrets
 if "API_URL" in st.secrets:
     API_URL = st.secrets["API_URL"]
     BUCKET_NAME = st.secrets["BUCKET_NAME"]
+    SNS_TOPIC_ARN = st.secrets.get("SNS_TOPIC_ARN") # <--- NEW
+    
     if "AWS_ACCESS_KEY_ID" in st.secrets:
         os.environ["AWS_ACCESS_KEY_ID"] = st.secrets["AWS_ACCESS_KEY_ID"]
         os.environ["AWS_SECRET_ACCESS_KEY"] = st.secrets["AWS_SECRET_ACCESS_KEY"]
         os.environ["AWS_DEFAULT_REGION"] = st.secrets["AWS_DEFAULT_REGION"]
 else:
+    # Local fallback
     API_URL = os.getenv("API_URL")
     BUCKET_NAME = os.getenv("BUCKET_NAME")
+    SNS_TOPIC_ARN = os.getenv("SNS_TOPIC_ARN")
 
 st.set_page_config(page_title="Bill-E Audit Dashboard", layout="wide")
 
-# ---  THE Security Check ---
-# This stops anyone without the code from seeing the app
-st.sidebar.title("Login")
+# --- THE BOUNCER & THE DOORBELL ---
+st.sidebar.title("🔒 Login")
 password = st.sidebar.text_input("Enter Access Code", type="password")
 
-if password != "admin123":  # <--- YOU CAN CHANGE THIS PASSWORD
+if password == "admin123":
+    # 1. Check if we already rang the doorbell for this user session
+    if "doorbell_rung" not in st.session_state:
+        # 2. Ring the Doorbell (Send Email)
+        if SNS_TOPIC_ARN:
+            try:
+                sns = boto3.client('sns')
+                sns.publish(
+                    TopicArn=SNS_TOPIC_ARN,
+                    Message=f"🔔 Ding Dong! Someone just logged into Bill-E Dashboard at {datetime.datetime.now()}.",
+                    Subject=" Bill-E Visitor Alert"
+                )
+                print("Doorbell rung!")
+            except Exception as e:
+                print(f"Doorbell broken: {e}")
+        
+        # 3. Mark as rung so we don't spam you on every refresh
+        st.session_state["doorbell_rung"] = True
+        
+    st.sidebar.success("Access Granted")
+
+else:
     st.title("🧾 Bill-E: Live Audit Ledger")
     st.markdown("---")
     st.warning("Access Restricted")
     st.info("This is a live portfolio project. Please enter the access code to view the dashboard.")
-    st.stop()  # STOPS execution here. The rest of the code won't run.
+    st.stop() 
 
-# ---  APP STARTS HERE (Only runs if password is correct) ---
+# ---  APP STARTS HERE ---
 
 # --- SAFETY CHECK ---
 if not API_URL or not BUCKET_NAME:
-    st.error("Missing Configuration! Check your .env or Streamlit Secrets.")
+    st.error("Missing Configuration! Check your secrets.")
     st.stop()
 
 # --- SIDEBAR SETTINGS ---
-st.sidebar.success("Access Granted")
 st.sidebar.markdown("---")
 st.sidebar.title("⚙️ Settings")
 use_auto_refresh = st.sidebar.checkbox("Enable Live Updates", value=True)
@@ -59,7 +83,7 @@ st.subheader("Upload New Receipt")
 uploaded_file = st.file_uploader("Choose a receipt image", type=['png', 'jpg', 'jpeg'])
 
 if uploaded_file is not None:
-    if st.button("Upload to Cloud"):
+    if st.button(" Upload to Cloud"):
         with st.spinner("Uploading..."):
             s3 = boto3.client('s3')
             try:
