@@ -95,3 +95,4 @@ terraform apply
 * Add secrets (API_URL, BUCKET_NAME, AWS_ACCESS_KEY_ID, etc.) in the Streamlit settings.
 
 ## Screenshots
+![Dashboard Screenshot](bill-e-dashboard.png)
