@@ -9,6 +9,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
 ![Status](https://img.shields.io/badge/Status-Live_Production-success?style=for-the-badge)
 
+**Live Primary Dashboard (Next.js):** [View Live on Vercel](https://bill-e-audit.vercel.app/)
 **Bill-E** is an automated, event-driven cloud pipeline designed to audit financial receipts in real-time. It uses **AI (Computer Vision)** to extract text from unstructured images, applies a **Heuristic Risk Engine** to detect fraud (e.g., "Casino", "Alcohol"), and instantly notifies auditors via **Email Alerts** if high-risk items are found.
 
 The entire backend is deployed via **Infrastructure as Code (Terraform)** and visualized on a lightning-fast, zero-cold-start **Next.js Dashboard** (with a secondary legacy Streamlit interface).
