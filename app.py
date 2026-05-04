@@ -7,7 +7,7 @@ import datetime
 from dotenv import load_dotenv
 from streamlit_autorefresh import st_autorefresh
 
-# --- CONFIGURATION ---
+# CONFIGURATION 
 load_dotenv()
 
 # Securely load secrets (Streamlit Cloud or Local .env)
@@ -26,22 +26,21 @@ else:
 
 st.set_page_config(page_title="Bill-E Audit Dashboard", layout="wide")
 
-# --- AUTH STATE INITIALIZATION ---
+# AUTH STATE INITIALIZATION 
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
-# --- PUBLIC HEADER (Visible to Everyone) ---
+#  PUBLIC HEADER (Visible to Everyone) 
 st.title("🧾 Bill-E: Live Audit Ledger")
 st.markdown("This dashboard is **Public Read-Only**. Authentication is required for write operations.")
 st.markdown("---")
 
-# --- SAFETY CHECK ---
+#  SAFETY CHECK 
 if not API_URL or not BUCKET_NAME:
     st.error(" Configuration Error: Secrets missing.")
     st.stop()
 
-# --- FETCH & DISPLAY DATA (Public) ---
-# This runs for EVERYONE so recruiters see the cool charts immediately.
+#  FETCH & DISPLAY DATA (Public)
 try:
     response = requests.get(API_URL)
     if response.status_code == 200:
@@ -59,14 +58,14 @@ try:
             if 'RiskScore' in df.columns:
                 df['RiskScore'] = pd.to_numeric(df['RiskScore'], errors='coerce').fillna(0)
 
-            # --- METRICS SECTION ---
+            #  METRICS SECTION 
             col1, col2, col3 = st.columns(3)
             col1.metric("Total Receipts", len(df))
             
             processed_count = len(df[df['Status'].isin(['Processed', 'Analyzed'])]) if 'Status' in df.columns else 0
             col2.metric("Processed Successfully", processed_count)
             
-            # --- TABLE SECTION ---
+            #  TABLE SECTION 
             st.subheader("Public Audit Trail")
             
             def highlight_risk(row):
@@ -83,58 +82,25 @@ except Exception as e:
     st.error(f"Connection Error: {str(e)}")
 
 
-# --- PROTECTED SECTION (The Magic Part) ---
+#  PUBLIC UPLOAD SECTION 
 st.divider()
-st.subheader("🔐 Admin Zone")
+st.subheader("Upload New Receipt")
+st.markdown("Public ingestion route. Files will be processed by the serverless pipeline.")
 
-if not st.session_state["authenticated"]:
-    # 1. SHOW LOCK SCREEN
-    col_lock1, col_lock2 = st.columns([2, 1])
-    with col_lock1:
-        st.info("Upload functionality is restricted to authorized auditors.")
-        password_input = st.text_input("Enter Access Code", type="password")
-        
-        if st.button("Unlock Admin Features"):
-            if password_input == "admin123":
-                st.session_state["authenticated"] = True
-                st.rerun()
-            else:
-                st.error("Access Denied")
-else:
-    # 2. SHOW UPLOAD TOOLS (Unlocked)
-    st.success("Authenticated. Write Access Granted.")
-    
-    # The "Doorbell" Notification (Runs once upon unlock)
-    if "doorbell_rung" not in st.session_state and SNS_TOPIC_ARN:
-        try:
-            sns = boto3.client('sns')
-            sns.publish(
-                TopicArn=SNS_TOPIC_ARN,
-                Message=f"🔔 Admin Access Unlocked at {datetime.datetime.now()}",
-                Subject="Bill-E Admin Alert"
-            )
-            st.session_state["doorbell_rung"] = True
-        except:
-            pass
+# File Uploader
+uploaded_file = st.file_uploader("Choose a receipt image", type=['png', 'jpg', 'jpeg'])
 
-    # File Uploader
-    uploaded_file = st.file_uploader("Upload Receipt for Audit", type=['png', 'jpg', 'jpeg'])
+if uploaded_file is not None:
+    if st.button("Upload to Cloud Pipeline"):
+        with st.spinner("Uploading to S3..."):
+            s3 = boto3.client('s3')
+            try:
+                s3.upload_fileobj(uploaded_file, BUCKET_NAME, uploaded_file.name)
+                st.success(f"File {uploaded_file.name} sent to processing queue!")
+            except Exception as e:
+                st.error(f"Upload failed: {e}")
 
-    if uploaded_file is not None:
-        if st.button("Upload to Cloud Pipeline"):
-            with st.spinner("Uploading to S3..."):
-                s3 = boto3.client('s3')
-                try:
-                    s3.upload_fileobj(uploaded_file, BUCKET_NAME, uploaded_file.name)
-                    st.success(f"File {uploaded_file.name} sent to processing queue!")
-                except Exception as e:
-                    st.error(f"Upload failed: {e}")
-    
-    # Auto-Refresh Logic (Only runs for Admins to save costs)
-    use_auto_refresh = st.checkbox("Enable Live Polling", value=True)
-    if use_auto_refresh:
-        st_autorefresh(interval=10000, limit=20, key="data_refresh")
-
-    if st.button("Lock Dashboard"):
-        st.session_state["authenticated"] = False
-        st.rerun()
+# Auto-Refresh Logic
+use_auto_refresh = st.checkbox("Enable Live Polling", value=True)
+if use_auto_refresh:
+    st_autorefresh(interval=5000, limit=100, key="data_refresh")

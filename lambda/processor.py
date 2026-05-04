@@ -2,6 +2,7 @@ import json
 import boto3
 import urllib.parse
 import urllib.request
+import socket       
 import os
 import base64
 import datetime
@@ -10,11 +11,11 @@ import hashlib
 def lambda_handler(event, context):
     s3 = boto3.client('s3')
     dynamodb = boto3.resource('dynamodb')
-    sns = boto3.client('sns')  # <---  Connect to SNS
+    sns = boto3.client('sns')
     
     table = dynamodb.Table(os.environ['TABLE_NAME'])
     ocr_api_key = os.environ['OCR_API_KEY']
-    sns_topic_arn = os.environ['SNS_TOPIC_ARN'] # <---  Get the Topic Address
+    sns_topic_arn = os.environ.get('SNS_TOPIC_ARN')
 
     for record in event['Records']:
         try:
@@ -33,7 +34,19 @@ def lambda_handler(event, context):
             # 3. Create Hash
             file_hash = hashlib.sha256(image_bytes).hexdigest()
 
-            # 4. Call OCR API (Engine 2)
+            # NEW: WRITE "PROCESSING" BREADCRUMB TO DYNAMODB
+
+            table.put_item(Item={
+                'ReceiptID': file_hash,
+                'Filename': file_key,
+                'UploadDate': datetime.datetime.now().isoformat(),
+                'Status': 'Processing',
+                'ExtractedText': 'Analyzing image...',
+                'RiskScore': 0,
+                'RiskFlags': []
+            })
+
+            # 4. Call OCR API (Engine 2) with Strict Timeout
             b64_image = base64.b64encode(image_bytes).decode('utf-8')
             
             data = urllib.parse.urlencode({
@@ -46,8 +59,26 @@ def lambda_handler(event, context):
 
             req = urllib.request.Request("https://api.ocr.space/parse/image", data=data)
             
-            with urllib.request.urlopen(req) as f:
-                ocr_result = json.loads(f.read().decode('utf-8'))
+            # NEW: TIMEOUT CATCHER (25 Seconds)
+            try:
+                with urllib.request.urlopen(req, timeout=25) as f:
+                    ocr_result = json.loads(f.read().decode('utf-8'))
+            
+            except (urllib.error.URLError, socket.timeout) as e:
+                print(f"OCR API Timeout/Error caught: {e}")
+                
+                # Write the error state to DynamoDB so the UI updates
+                table.put_item(Item={
+                    'ReceiptID': file_hash,
+                    'Filename': file_key,
+                    'UploadDate': datetime.datetime.now().isoformat(),
+                    'Status': 'Error - OCR Timeout',
+                    'ExtractedText': 'API failed to respond in time. Please try again.',
+                    'RiskScore': 0,
+                    'RiskFlags': ['System Error']
+                })
+                # Skip the rest of the logic for this specific file, but don't crash
+                continue 
 
             # 5. Extract Text & Analyze Risk
             extracted_text = "No text found"
@@ -57,7 +88,7 @@ def lambda_handler(event, context):
             if ocr_result.get('ParsedResults'):
                 extracted_text = ocr_result['ParsedResults'][0].get('ParsedText', '')
                 
-                # --- RISK ENGINE ---
+                # RISK ENGINE 
                 lower_text = extracted_text.lower()
                 
                 suspicious_keywords = ['casino', 'alcohol', 'bar', 'beer', 'wine', 'vodka']
@@ -66,8 +97,8 @@ def lambda_handler(event, context):
                         risk_score += 50
                         risk_flags.append(f"Suspicious Item: {word}")
 
-            # 6. --- THE SNITCH PROTOCOL  --- 
-            if risk_score > 0:
+            # 6.THE SNITCH PROTOCOL 
+            if risk_score > 0 and sns_topic_arn:
                 print(f" HIGH RISK DETECTED: {risk_score}")
                 message = (
                     f"ALERT: High Risk Receipt Detected!\n\n"
@@ -86,7 +117,7 @@ def lambda_handler(event, context):
                 except Exception as e:
                     print(f"Failed to send email: {e}")
 
-            # 7. Save to DynamoDB
+            # 7. Save Final Success State to DynamoDB
             item = {
                 'ReceiptID': file_hash,
                 'Filename': file_key,
@@ -101,6 +132,20 @@ def lambda_handler(event, context):
             print(f"Analysis Complete for {file_key}. Risk Score: {risk_score}")
 
         except Exception as e:
-            print(f"Error: {str(e)}")
+            print(f"General Error: {str(e)}")
+            
+            # Catch-all to ensure the UI doesn't hang if something else breaks
+            try:
+                table.put_item(Item={
+                    'ReceiptID': str(file_key), 
+                    'Filename': file_key,
+                    'UploadDate': datetime.datetime.now().isoformat(),
+                    'Status': 'System Error',
+                    'ExtractedText': str(e)[:100],
+                    'RiskScore': 0,
+                    'RiskFlags': ['Failed']
+                })
+            except:
+                pass
 
     return {'statusCode': 200}
